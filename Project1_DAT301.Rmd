@@ -1,0 +1,238 @@
+---
+name: Annabelle Allen
+title: "Project1 DAT 301"
+output: pdf_document
+date: "2022-12-4"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, 
+
+```{R}
+library("reshape2")
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(readr)
+library(caret)
+```
+Question: 
+I will be analyzing the data that was collected from Gallup to calculate the world happiness score. I will be coding a linear regression model in order to determine which measured factor has the greatest impact on the world happiness score. 
+
+Overview of the data:
+The data I am using is from Kaggle which is a csv file that combines 5 years of cleaned data from Gallup's world happiness center's research, of which the subscores total to the happiness score.They host "the most comprehensive and farthest-reaching survey of the world." it reaches over 99% of the worlds population through the collaboration with independent researchers and other private orgs. Gallup polls are widely used in policy-making decisions and look at how the human population is experiencing their quality of life, as well as other public opinion polls. The file is the cleaned data as well as several categorical variables. The original data was collected from transparency.org. The data is already very clean and so I didnt't need to wrangle it that much. I created new data frames from it though, throughout the report that show a few different pieces of information about the data. and one that simplifies it when running the regression models later in the data
+
+The variables that go into calculating the happiness score are family, health, freedom, generosity, government trust,and gdp per capita. there are also categorical variables for the continent, country, and the year the data was from. There's 3 other numerical variables that are in the data that we won't specifically be looking at in this assignment, they are the dystopia residual, social support, and cpi score. I will rbe doing more exploratory data analysis on those in the python assignment.  
+
+the happiness score is what is calculated by summing the measured factors included.  The happiness score is based on a 1-10 scale and each subscore calculates to a portion of that. 
+
+```{R}
+WorldHappiness_df <- read.csv("~/Downloads/WorldHappiness_Corruption_2015_2020.csv")
+summary(WorldHappiness_df)
+head(WorldHappiness_df)
+WorldHappiness_df <- transform(WorldHappiness_df, Country = factor(Country))
+```
+
+```{r}
+continent_mean <- WorldHappiness_df %>%
+  group_by(continent) %>%
+  summarize(meanHappiness = mean(happiness_score))
+
+```
+
+```{r}
+mean_happiness <- mean(WorldHappiness_df$happiness_score) #5.473
+sd_happiness <- sd(WorldHappiness_df$happiness_score) #1.124
+max_happiness <- max(WorldHappiness_df$happiness_score) #7.809
+min_happiness <- min(WorldHappiness_df$happiness_score) #2.567
+```
+
+Data Visualization: This graph shows the different distribution of the happiness scales by year, I was hoping to see some sort of noticeable difference between the years but that doesn't seem to be the case. Even in 2020, pandemic year there was no noticeable difference. 
+```{r}
+ggplot(WorldHappiness_df, aes(x = Country, y = happiness_score)) + geom_point() +facet_wrap(~ Year)
+```
+```{r}
+WorldHappiness_df %>%
+  group_by(continent) %>%
+  ggplot(aes(x = Country, y = happiness_score)) + geom_point() + facet_wrap(~ continent)
+```
+```{r}
+WorldHappiness_df %>%
+  filter(continent == "Asia") %>%
+  ggplot(aes(x = Country, y = happiness_score)) + geom_point() +facet_wrap(~ Year)
+```
+```{r}
+WorldHappiness_df %>%
+  filter(continent == "Africa") %>%
+  ggplot(aes(x = Country, y = happiness_score)) + geom_point() +facet_wrap(~ Year)
+```
+
+```{r}
+ggplot(WorldHappiness_df, aes(happiness_score)) + 
+geom_histogram(binwidth = .2, fill = 'darkgreen', color = "black")
+```
+
+```{r}
+ggplot(continent_mean, aes(x = continent, y = meanHappiness)) + geom_bar(stat = "identity", fill = 'lightpink', color = "black")
+```
+
+```{r}
+ggplot(WorldHappiness_df, aes(x = happiness_score, y = generosity)) + geom_point() +facet_wrap(~ Year)
+```
+```{r}
+ggplot(WorldHappiness_df, aes(x = happiness_score, y = gdp_per_capita)) + geom_point() + facet_wrap(~ Year)
+```
+```{R}
+WorldHappiness_df %>%
+  ggplot(aes(x = happiness_score, y = health )) + geom_point() +facet_wrap(~ Year)
+```
+```{R, echo = "FALSE"}
+ggplot(WorldHappiness_df, aes(health)) +geom_histogram(aes(y = ..density..), fill = "pink") + geom_density()
+```
+
+```{R, echo = "FALSE"}
+ggplot(WorldHappiness_df, aes(gdp_per_capita)) +geom_histogram(aes(y = ..density..), fill = "pink") + geom_density()
+```
+
+```{```
+Box Plots:
+in order to better observe the outliers in the data I created a box plot to look at the outliers of the variables. before I do this though I created a data frame that only has the factors that sum to the happiness score along with the country and year. this is so that we aren't concerned with the other variables that will not be calculated in the coming regression models.
+```{r}
+happiness_scores <- WorldHappiness_df %>%
+  select(Country, happiness_score, gdp_per_capita, health, freedom, generosity, government_trust, Year)
+```
+
+```{R}
+library(reshape2)
+meltData <- melt(happiness_scores)
+p <- ggplot(meltData, aes(factor(variable), value))
+p + geom_boxplot() + facet_wrap(~variable, scale="free")
+```
+linear regression: in this section I looked at how different scores effected the happiness scores the most. I ran linear model regressions on the factors of health and gdp per capita in regard to the happiness score. looking at the results of these we can see that the model worked much better for the gdp and they are very correlated the r value is .97 which means that it is very close to 1 which would be an exact fit. it was much more accurate than the preceding health factor which came up with an r value of .8877, much less accurate than that of the gdp model. I also ran a regression of one of the least correlated factors to the happiness score, generosity. this calculated an r value of 0.0352 making it not correlated or accurate. Due to these models come to the conclusion that the gdp has the most significant impact on the happiness score of a specific country. those that had a significant relationship over the course of all 6 years that data was collected from are health, freedom and family. the only conditions that didn't have a significant impact were government trust and generosity. 
+
+```{r}
+library(caret)
+index <- createDataPartition(happiness_scores$health, p = .70, list = FALSE)
+train <- happiness_scores[index, ]
+test <- happiness_scores[-index, ]
+```
+
+```{r}
+health_model <- lm(health ~ ., dat = train)
+summary(health_model)
+plot(health_model)
+```
+
+```{r}
+test$predicted_health <- predict(health_model, test)
+head(test[, c("health", "predicted_health")])
+```
+
+```{r}
+test$predicted_health <- predict(health_model, test)
+head(test[,c("health", "predicted_health")])
+```
+```{r}
+real <- test$health
+prediction <- test$predicted_health
+rss <- sum((prediction - real) ^ 2)
+tss <- sum((real - mean(real)) ^ 2)
+rsq <- 1 - rss/tss
+rsq
+```
+
+
+```{r}
+library(caret)
+index <- createDataPartition(happiness_scores$gdp_per_capita, p = .70, list = FALSE)
+train <- happiness_scores[index, ]
+test <- happiness_scores[-index, ]
+```
+
+```{r}
+gdp_model <- lm(gdp_per_capita ~ ., dat = train)
+summary(gdp_model)
+plot(gdp_model)
+```
+
+```{r}
+test$predicted_gdp <- predict(gdp_model, test)
+head(test[, c("gdp_per_capita", "predicted_gdp")])
+```
+
+```{r}
+real <- test$gdp_per_capita
+prediction <- test$predicted_gdp
+rss <- sum((prediction - real) ^ 2)
+tss <- sum((real - mean(real)) ^ 2)
+rsq <- 1 - rss/tss
+rsq
+```
+
+```{r}
+index <- createDataPartition(happiness_scores$generosity, p = .70, list = FALSE)
+train <- happiness_scores[index, ]
+test <- happiness_scores[-index, ]
+```
+
+```{r}
+gen_model <- lm(generosity ~ ., dat = train)
+summary(gen_model)
+```
+
+```{r}
+test$predicted_generosity <- predict(gen_model, test)
+head(test[, c("generosity", "predicted_generosity")])
+```
+
+```{r}
+real <- test$generosity
+prediction <- test$predicted_generosity
+rss <- sum((prediction - real) ^ 2)
+tss <- sum((real - mean(real)) ^ 2)
+rsq <- 1 - rss/tss
+rsq
+```
+
+Here I did linear models on all of the factors that effect the happiness scores. we can also see here as wel as previously visualized that gdp and health have the greatest impact on the happiness score for a specific country
+```{r}
+family_model <- lm(family ~ happiness_score, dat = WorldHappiness_df) #.076
+family_model
+govTrust_md <-lm(government_trust ~ happiness_score, dat = WorldHappiness_df) #0.044
+govTrust_md
+health_model <- lm(health ~ happiness_score, dat = WorldHappiness_df) #0.1556
+health_model
+freedom_model <- lm(freedom ~ happiness_score, dat = WorldHappiness_df) #0.07162
+freedom_model
+generosity_model <- lm(generosity ~ happiness_score, dat = WorldHappiness_df) #0.01681
+generosity_model
+```
+
+```{R}
+corr_health = cor.test(WorldHappiness_df$health,WorldHappiness_df$happiness_score, method = "pearson")
+corr_health
+```
+
+```{r}
+corr_gdp = cor.test(WorldHappiness_df$gdp_per_capita,WorldHappiness_df$happiness_score, method = "pearson")
+corr_health
+```
+
+```{R}
+corr_gen = cor.test(WorldHappiness_df$generosity, WorldHappiness_df$happiness_score, method = "pearson")
+corr_gen
+```
+
+Citations: 
+https://www.r-bloggers.com/2020/05/step-by-step-guide-on-how-to-build-linear-regression-in-r-with-code/
+https://www.scribbr.com/statistics/linear-regression-in-r/
+https://www.kaggle.com/datasets/eliasturk/world-happiness-based-on-cpi-20152020/code?resource=download
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
